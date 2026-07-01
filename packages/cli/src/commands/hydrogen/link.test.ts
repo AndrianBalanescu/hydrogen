@@ -7,7 +7,7 @@ import {
 } from '@shopify/cli-kit/node/ui';
 import {type AdminSession, login} from '../../lib/auth.js';
 import {getStorefronts} from '../../lib/graphql/admin/link-storefront.js';
-import {runLink} from './link.js';
+import Link, {runLink} from './link.js';
 import {createStorefront} from '../../lib/graphql/admin/create-storefront.js';
 import {waitForJob} from '../../lib/graphql/admin/fetch-job.js';
 import {setStorefront} from '../../lib/shopify-config.js';
@@ -94,6 +94,12 @@ describe('link', () => {
     expect(getStorefronts).toHaveBeenCalledWith(ADMIN_SESSION);
   });
 
+  it('logs in with the provided shop when --shop is provided', async () => {
+    await runLink({path: 'my-path', shop: 'other-shop.myshopify.com'});
+
+    expect(login).toHaveBeenCalledWith('my-path', 'other-shop.myshopify.com');
+  });
+
   it('renders a list of choices and forwards the selection to setStorefront', async () => {
     vi.mocked(renderSelectPrompt).mockResolvedValue(
       FULL_SHOPIFY_CONFIG.storefront.id,
@@ -160,6 +166,48 @@ describe('link', () => {
 
       expect(outputMock.info()).toContain(
         `${expectedStorefrontName} is now linked`,
+      );
+    });
+
+    it('skips storefront selection when --create-storefront is provided', async () => {
+      await runLink({createStorefront: true});
+
+      expect(renderSelectPrompt).not.toHaveBeenCalled();
+      expect(renderTextPrompt).toHaveBeenCalledWith({
+        message: expect.stringMatching(/name/i),
+        defaultValue: expect.any(String),
+      });
+    });
+
+    it('uses --storefront-name without prompting for selection or name', async () => {
+      await runLink({storefrontName: expectedStorefrontName});
+
+      expect(renderSelectPrompt).not.toHaveBeenCalled();
+      expect(renderTextPrompt).not.toHaveBeenCalled();
+      expect(createStorefront).toHaveBeenCalledWith(
+        ADMIN_SESSION,
+        expectedStorefrontName,
+      );
+    });
+
+    it('normalizes CLI flag names before creating a storefront', async () => {
+      await Link.run([
+        '--path',
+        'my-path',
+        '--shop',
+        'my-shop.myshopify.com',
+        '--create-storefront',
+        '--storefront-name',
+        expectedStorefrontName,
+        '--force',
+      ]);
+
+      expect(login).toHaveBeenCalledWith('my-path', 'my-shop.myshopify.com');
+      expect(renderSelectPrompt).not.toHaveBeenCalled();
+      expect(renderTextPrompt).not.toHaveBeenCalled();
+      expect(createStorefront).toHaveBeenCalledWith(
+        ADMIN_SESSION,
+        expectedStorefrontName,
       );
     });
 
@@ -234,6 +282,17 @@ describe('link', () => {
 
         expect(outputMock.warn()).toMatch(/Couldn\'t find Does not exist/g);
       });
+    });
+
+    it('rejects storefront creation flags', async () => {
+      await expect(
+        runLink({
+          storefront: 'Hydrogen',
+          storefrontName: 'New Storefront',
+        }),
+      ).rejects.toThrow('storefront');
+
+      expect(setStorefront).not.toHaveBeenCalled();
     });
   });
 });
