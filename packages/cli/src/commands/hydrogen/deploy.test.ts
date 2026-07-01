@@ -1079,6 +1079,20 @@ describe('deploy', async () => {
           message: expect.any(String),
         });
       });
+
+      it("doesn't render a user confirmation on deploy when the force flag is provided", async () => {
+        await runDeploy({
+          ...deployParams,
+          env: 'production',
+          force: true,
+        });
+
+        expect(renderConfirmationPrompt).not.toHaveBeenCalledWith({
+          confirmationMessage: 'Yes, confirm deploy',
+          cancellationMessage: 'No, cancel deploy',
+          message: expect.any(String),
+        });
+      });
     });
 
     describe('user provides a preview environment', () => {
