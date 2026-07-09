@@ -101,5 +101,8 @@
     "react": {
       "optional": true
     }
+  },
+  "hydrogen": {
+    "type": "primitives"
   }
 }
